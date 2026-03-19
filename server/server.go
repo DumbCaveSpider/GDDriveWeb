@@ -573,18 +573,18 @@ func startServer() {
 
 	fmt.Println("Welcome to GDDrive!")
 
-	// Unified Server: Serve static files from the "dist" directory if it exists
+	// Serve static files from the "dist" directory if it exists
 	distPaths := []string{"./dist", "../dist"}
 	for _, p := range distPaths {
 		if _, err := os.Stat(p); err == nil {
 			mux.Handle("/", http.FileServer(http.Dir(p)))
-			log("Consolidated Server: Serving frontend from "+p, 0)
+			log("GDDrive Server: Serving frontend from "+p, 0)
 			break
 		}
 	}
 
-	log("GDDrive Unified Server running on :3030", 0)
-	http.ListenAndServe(":3030", mux)
+	log("GDDrive Server running on :3002", 0)
+	http.ListenAndServe(":3002", mux)
 }
 
 func main() {
