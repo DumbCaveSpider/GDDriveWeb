@@ -480,9 +480,10 @@ func handleDownload(w http.ResponseWriter, r *http.Request) {
 	fileBytes := parseLevel(levelString)
 
 	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", strconv.Itoa(len(fileBytes)))
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, req.FileName))
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Expose-Headers", "Content-Disposition")
+	w.Header().Set("Access-Control-Expose-Headers", "Content-Disposition, Content-Length")
 	w.WriteHeader(200)
 	w.Write(fileBytes)
 }

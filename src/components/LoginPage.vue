@@ -86,7 +86,7 @@ async function doLoginValidate() {
     <div class="login-card">
       <div class="logo-block">
         <img class="brand-logo" src="../assets/gddrive-logo.png" alt="GD Drive" />
-        <p class="brand-sub">Store files inside a Geometry Dash level</p>
+        <p class="brand-sub">Store files inside the Geometry Dash Server</p>
         <footer class="app-footer">
           <p>Watch this video by <a href="https://youtube.com/@SweepSweep2" target="_blank" rel="noopener noreferrer">@SweepSweep2</a> on how it works!</p>
           <div class="video-embed">

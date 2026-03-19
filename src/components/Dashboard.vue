@@ -17,8 +17,10 @@ const activeTab = ref<'view' | 'upload' | 'download' | 'delete'>('view')
 
 const uploadFile = ref<File | null>(null)
 const uploadDragging = ref(false)
-const downloadingFiles = ref<Set<string>>(new Set())
+const downloadingFiles = ref<Record<string, boolean>>({})
+const downloadProgress = ref<Record<string, number>>({})
 const loading = ref(false)
+const uploadProgress = ref(0)
 
 async function fetchFiles() {
   try {
@@ -44,26 +46,61 @@ async function doLogout() {
 async function doUpload() {
   if (!uploadFile.value) { emit('showToast', 'Please select a file first.', 'error'); return }
   loading.value = true
+  uploadProgress.value = 0
   try {
     const form = new FormData()
     form.append('file', uploadFile.value)
-    const res = await fetch(`${API}/files/upload`, {
-      method: 'POST',
-      headers: credHeaders(),
-      body: form,
+    let processingToastShown = false
+    
+    const json = await new Promise<any>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${API}/files/upload`)
+      
+      const headers = credHeaders()
+      Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v))
+      xhr.withCredentials = true
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 100)
+          uploadProgress.value = percent
+          
+          if (percent === 100 && !processingToastShown) {
+            emit('showToast', 'Uploading File to the Geometry Dash Server...', 'info')
+            processingToastShown = true
+          }
+        }
+      }
+
+      xhr.onload = () => {
+        try {
+          resolve(JSON.parse(xhr.responseText))
+        } catch (e) {
+          reject(new Error('Failed to parse response'))
+        }
+      }
+
+      xhr.onerror = () => reject(new Error('Upload request failed'))
+      
+      xhr.send(form)
     })
-    const json = await res.json()
+
     emit('showToast', json.message ?? (json.success ? 'Uploaded!' : 'Upload failed.'), json.success ? 'success' : 'error')
     if (json.success) { uploadFile.value = null; fetchFiles() }
-  } finally { loading.value = false }
+  } catch (err) {
+    emit('showToast', 'Upload failed to reach server.', 'error')
+  } finally { 
+    loading.value = false 
+    uploadProgress.value = 0
+  }
 }
 
 async function doDownload(name: string) {
   const target = name
   if (!target) return
 
-  if (name) downloadingFiles.value.add(name)
-  else loading.value = true
+  downloadingFiles.value[target] = true
+  downloadProgress.value[target] = 0
 
   try {
     const res = await fetch(`${API}/files/download`, {
@@ -72,17 +109,41 @@ async function doDownload(name: string) {
       body: JSON.stringify({ file_name: target }),
     })
     if (!res.ok) {
-      const j = await res.json(); emit('showToast', j.message ?? 'Download failed.', 'error'); return
+      const j = await res.json()
+      emit('showToast', j.message ?? 'Download failed.', 'error')
+      return
     }
-    const blob = await res.blob()
+
+    const contentLength = res.headers.get('Content-Length')
+    const total = contentLength ? parseInt(contentLength, 10) : 0
+    let loaded = 0
+
+    const reader = res.body!.getReader()
+    const chunks = []
+
+    while(true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      chunks.push(value)
+      loaded += value.length
+      if (total > 0) {
+        downloadProgress.value[target] = Math.round((loaded / total) * 100)
+      } else {
+        downloadProgress.value[target] = Math.min((downloadProgress.value[target] || 0) + 5, 95)
+      }
+    }
+
+    const blob = new Blob(chunks)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url; a.download = target; a.click()
     URL.revokeObjectURL(url)
-    emit('showToast', 'Download started!', 'success')
+    emit('showToast', 'Download complete!', 'success')
+  } catch (err: any) {
+    emit('showToast', err.message || 'Download failed.', 'error')
   } finally {
-    if (name) downloadingFiles.value.delete(name)
-    else loading.value = false
+    delete downloadingFiles.value[target]
+    delete downloadProgress.value[target]
   }
 }
 
@@ -179,10 +240,14 @@ async function doDeleteAccount() {
               <div class="file-info">
                 <span class="file-name">{{ f.name }}</span>
                 <span class="file-meta">Level ID: {{ f.level_id }} · Level Name: {{ f.level_name }}</span>
+                <div v-if="downloadingFiles[f.name]" class="dl-progress-bar-container">
+                  <div class="dl-progress-bar" :style="{ width: (downloadProgress[f.name] || 0) + '%' }"></div>
+                  <span class="dl-progress-text">{{ downloadProgress[f.name] || 0 }}%</span>
+                </div>
               </div>
               <div class="file-actions">
-                <button class="btn-sm" title="Download" :disabled="downloadingFiles.has(f.name)" @click="doDownload(f.name)">
-                  <img v-if="!downloadingFiles.has(f.name)" class="btn-icon" src="../assets/download.png" alt="Download" />
+                <button class="btn-sm" title="Download" :disabled="downloadingFiles[f.name]" @click="doDownload(f.name)">
+                  <img v-if="!downloadingFiles[f.name]" class="btn-icon" src="../assets/download.png" alt="Download" />
                   <span v-else class="spinner"></span>
                 </button>
                 <button class="btn-sm danger" title="Delete" @click="doDelete(f.name)">
@@ -214,9 +279,13 @@ async function doDeleteAccount() {
               <p class="drop-title">{{ uploadFile.name }}</p>
             </div>
           </div>
+          <div v-if="loading" class="progress-bar-container">
+            <div class="progress-bar" :style="{ width: uploadProgress + '%' }"></div>
+            <span class="progress-text">{{ uploadProgress }}%</span>
+          </div>
           <button class="btn-primary" :class="{ loading }" :disabled="loading || !uploadFile" @click="doUpload">
             <span v-if="!loading"><img class="btn-icon" src="../assets/upload.png" /> Upload to GD</span>
-            <span v-else class="spinner"></span>
+            <span v-else>Uploading...</span>
           </button>
         </div>
       </div>
@@ -227,3 +296,61 @@ async function doDeleteAccount() {
     </footer>
   </div>
 </template>
+
+<style scoped>
+.progress-bar-container {
+  width: 100%;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #a855f7, #7c3aed);
+  transition: width 0.2s ease;
+}
+
+.progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  font-family: 'Helvetica', Arial, sans-serif;
+  font-weight: bold;
+  color: white;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+.dl-progress-bar-container {
+  width: 100%;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  margin-top: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.dl-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #38bdf8, #3b82f6);
+  transition: width 0.2s ease;
+}
+
+.dl-progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 9px;
+  font-family: 'Helvetica', Arial, sans-serif;
+  font-weight: bold;
+  color: white;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+</style>
