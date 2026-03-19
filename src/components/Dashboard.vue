@@ -212,12 +212,14 @@ async function doDeleteAccount() {
         <div class="user-pill">
           <span>Logged in as: {{ username }}</span>
         </div>
-        <button id="delete-acc-btn" class="btn-sm secondary" title="Delete Account" :disabled="loading" @click="doDeleteAccount">
-          <img src="../assets/delete.png" class="btn-icon" alt="Delete" />
-        </button>
-        <button id="logout-btn" class="btn-sm secondary" title="Sign Out" @click="doLogout">
-          <img src="../assets/logout.png" class="btn-icon" alt="Logout" />
-        </button>
+        <div class="dash-user-actions">
+          <button id="delete-acc-btn" class="btn-sm secondary" title="Delete Account" :disabled="loading" @click="doDeleteAccount">
+            <img src="../assets/delete.png" class="btn-icon" alt="Delete" />
+          </button>
+          <button id="logout-btn" class="btn-sm secondary" title="Sign Out" @click="doLogout">
+            <img src="../assets/logout.png" class="btn-icon" alt="Logout" />
+          </button>
+        </div>
       </div>
     </header>
 
@@ -391,7 +393,20 @@ async function doDeleteAccount() {
   width: 200px;
 }
 
+.dash-user-actions {
+  display: flex;
+  gap: 8px;
+}
+
 @media (max-width: 600px) {
+  .panel-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+  }
+  .header-title-group {
+    text-align: center;
+  }
   .header-actions {
     flex-direction: column;
     width: 100%;
