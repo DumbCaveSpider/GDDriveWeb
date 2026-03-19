@@ -538,7 +538,6 @@ func generateRandomCode(n int) string {
 }
 
 func startServer() {
-	os.MkdirAll("Downloads", 0755)
 	initDB()
 
 	mux := http.NewServeMux()
