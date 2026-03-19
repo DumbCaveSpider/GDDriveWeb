@@ -7,45 +7,50 @@ const emit = defineEmits<{
   (e: 'showToast', msg: string, type: 'success' | 'error' | 'info'): void
 }>()
 
-const loginPhase = ref<'init' | 'verify'>('init')
-const requiresVerification = ref(true)
+const authPhase = ref<'landing' | 'login' | 'signup'>('landing')
 const username = ref('')
 const password = ref('')
 const accountId = ref('')
 const validationCode = ref('')
 const loading = ref(false)
 
-async function doLoginInit() {
-  if (!accountId.value) {
-    emit('showToast', 'Account ID is required to start validation.', 'error'); return
+function setPhase(p: 'landing' | 'login' | 'signup') {
+  authPhase.value = p
+  if (p === 'signup' && !validationCode.value) {
+    validationCode.value = Math.random().toString(36).substring(2, 10).toUpperCase()
+  }
+}
+
+
+async function doLogin() {
+  if (!username.value || !password.value) {
+    emit('showToast', 'Username and password are required.', 'error'); return
   }
   loading.value = true
   try {
-    const res = await fetch(`${API}/login/init`, {
+    const res = await fetch(`${API}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ account_id: accountId.value }),
+      body: JSON.stringify({ username: username.value, password: password.value }),
     })
     const json = await res.json()
     if (json.success) {
-      validationCode.value = json.data.validation_code || ''
-      requiresVerification.value = json.data.requires_verification
-      loginPhase.value = 'verify'
-      if (!requiresVerification.value) {
-        emit('showToast', 'Welcome back! Please enter your credentials.', 'info')
-      } else {
-        emit('showToast', 'Validation code generated!', 'success')
-      }
+      setCookie('gdd_username',   json.data.username)
+      setCookie('gdd_gjp2',       json.data.gjp2)
+      setCookie('gdd_account_id', json.data.account_id)
+      emit('loggedIn', json.data.username, json.data.account_id)
+      emit('showToast', json.message, 'success')
     } else {
-      emit('showToast', json.message ?? 'Failed to initialize login.', 'error')
+      emit('showToast', json.message ?? 'Login failed.', 'error')
     }
   } catch (err) {
     emit('showToast', 'Cannot reach server', 'error')
   } finally { loading.value = false }
 }
 
+
 async function doLoginValidate() {
-  if (!username.value || !password.value || (requiresVerification.value && !validationCode.value)) {
+  if (!username.value || !password.value || !validationCode.value) {
     emit('showToast', 'All fields are required.', 'error'); return
   }
   loading.value = true
@@ -90,29 +95,52 @@ async function doLoginValidate() {
         </footer>
       </div>
 
-      <!-- init the web -->
-      <form v-if="loginPhase === 'init'" @submit.prevent="doLoginInit" id="login-form-init">
+      <!-- LANDING: LOGIN OR SIGN UP -->
+      <div v-if="authPhase === 'landing'" class="landing-actions">
+        <button class="btn-primary large-btn" @click="setPhase('login')">
+          <span>Log In</span>
+        </button>
+        <button class="btn-secondary large-btn" @click="setPhase('signup')">
+          <span>Sign Up</span>
+        </button>
+      </div>
+
+      <!-- DIRECT LOGIN -->
+      <form v-else-if="authPhase === 'login'" @submit.prevent="doLogin" id="login-form-direct">
+        <div class="field-group">
+          <label for="login-username">Username</label>
+          <div class="input-wrap">
+            <input id="login-username" v-model="username" type="text" placeholder="GD Username" required />
+          </div>
+        </div>
+        <div class="field-group">
+          <label for="login-password">Password</label>
+          <div class="input-wrap">
+            <input id="login-password" v-model="password" type="password" placeholder="••••••••" required />
+          </div>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn-primary" :class="{ loading }" :disabled="loading">
+            <span v-if="!loading">Login</span>
+            <span v-else class="spinner"></span>
+          </button>
+          <button type="button" class="btn-secondary" @click="authPhase = 'landing'">Back</button>
+        </div>
+      </form>
+
+      <!-- SIGN UP FLOW -->
+      <form v-else-if="authPhase === 'signup'" @submit.prevent="doLoginValidate" id="login-form-signup">
+        <div class="verify-instructions">
+          <p>To verify ownership, set your profile's <strong>Custom</strong> field to the following token</p>
+          <div class="verify-code">{{ validationCode }}</div>
+        </div>
+
         <div class="field-group">
           <label for="gd-account-id">Geometry Dash Account ID</label>
           <div class="input-wrap">
             <input id="gd-account-id" v-model="accountId" type="text" placeholder="Account ID" required />
           </div>
         </div>
-        <div class="btn-row">
-          <button id="login-init-btn" type="submit" class="btn-primary" :class="{ loading }" :disabled="loading">
-            <span v-if="!loading">Continue</span>
-            <span v-else class="spinner"></span>
-          </button>
-        </div>
-      </form>
-
-      <!-- verify user -->
-      <form v-else @submit.prevent="doLoginValidate" id="login-form-verify">
-        <div v-if="requiresVerification" class="verify-instructions">
-          <p>To verify ownership, set your profile's <strong>Custom</strong> field to the following token</p>
-          <div class="verify-code">{{ validationCode }}</div>
-        </div>
-
         <div class="field-group">
           <label for="gd-username">Geometry Dash Username</label>
           <div class="input-wrap">
@@ -127,11 +155,11 @@ async function doLoginValidate() {
         </div>
         
         <div class="btn-row">
-          <button id="login-verify-btn" type="submit" class="btn-primary" :class="{ loading }" :disabled="loading">
-            <span v-if="!loading">Validate & Login</span>
+          <button id="signup-btn" type="submit" class="btn-primary" :class="{ loading }" :disabled="loading">
+            <span v-if="!loading">Link & Sign Up</span>
             <span v-else class="spinner"></span>
           </button>
-          <button type="button" class="btn-secondary" @click="loginPhase = 'init'" :disabled="loading">Back</button>
+          <button type="button" class="btn-secondary" @click="authPhase = 'landing'">Back</button>
         </div>
       </form>
 

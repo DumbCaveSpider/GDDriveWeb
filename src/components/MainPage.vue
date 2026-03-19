@@ -27,16 +27,10 @@ function handleLoggedOut() {
 }
 
 onMounted(async () => {
-  const savedUser = getCookie('gdd_username')
-  const savedGJP2  = getCookie('gdd_gjp2')
-  if (savedUser && savedGJP2) {
-    loggedInAs.value = savedUser
-    loggedInAccountID.value = getCookie('gdd_account_id') ?? ''
-    view.value = 'dashboard'
-  } else {
-    // Verify Go server is reachable
-    const res = await fetch(`${API}/status`, { headers: credHeaders() }).catch(() => null)
-    if (!res) showToast('Cannot reach the Go server. Start it with: go run . in server/', 'error')
+  // Always show the landing/login choice first as requested
+  const res = await fetch(`${API}/status`, { headers: credHeaders() }).catch(() => null)
+  if (!res) {
+    showToast('Cannot reach the Go server. Start it with: go run . in server/', 'error')
   }
 })
 </script>
@@ -412,6 +406,20 @@ onMounted(async () => {
 .dash-hint { font-family: 'Pusab', 'Chakra Petch', sans-serif; font-size: 20px; margin: 10px; }
 .dash-hint a { color: #7fc1ff; text-decoration: none; font-weight: 700; transition: color 0.1s; }
 .dash-hint a:hover { color: #7fc1ff; text-decoration: underline; }
+
+.landing-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+.large-btn {
+  padding: 18px !important;
+  font-size: 24px !important;
+  font-weight: 800 !important;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
 
 @media (max-width: 600px) {
   .login-card { padding: 32px 24px; }

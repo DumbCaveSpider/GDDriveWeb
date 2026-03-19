@@ -165,7 +165,6 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 }
-
 // POST /api/login/init — starts validation by returning a code
 func handleLoginInit(w http.ResponseWriter, r *http.Request) {
 	var req LoginInitRequest
@@ -173,111 +172,107 @@ func handleLoginInit(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, 400, APIResponse{Success: false, Message: "Invalid request body"})
 		return
 	}
-
 	if req.AccountID == "" {
 		respondJSON(w, 400, APIResponse{Success: false, Message: "Account ID is required"})
 		return
 	}
-
-	var exists int
-	err := db.QueryRow("SELECT 1 FROM accounts WHERE accountId = ?", req.AccountID).Scan(&exists)
-	requiresVerification := (err == sql.ErrNoRows)
-
-	var code string
-	if requiresVerification {
-		code = generateRandomCode(8)
-		pvLock.Lock()
-		pendingValidations[req.AccountID] = code
-		pvLock.Unlock()
-	}
-
+	code := generateRandomCode(8)
+	pvLock.Lock()
+	pendingValidations[req.AccountID] = code
+	pvLock.Unlock()
 	respondJSON(w, 200, APIResponse{
 		Success: true,
 		Data: map[string]interface{}{
 			"validation_code":       code,
-			"requires_verification": requiresVerification,
+			"requires_verification": true,
 		},
 	})
 }
 
-// POST /api/login/validate — checks GD user profile for the code and saves credentials
+// POST /api/login — direct login for existing accounts
+func handleLogin(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, 400, APIResponse{Success: false, Message: "Invalid request body"})
+		return
+	}
+
+	submittedGJP2 := generateGJP2(req.Password)
+
+	var accountId string
+	err := db.QueryRow("SELECT accountId FROM accounts WHERE username = ? AND gjp2 = ?", req.Username, submittedGJP2).Scan(&accountId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			respondJSON(w, 401, APIResponse{Success: false, Message: "Invalid credentials. If you haven't linked your account yet, please use Sign Up instead."})
+		} else {
+			respondJSON(w, 500, APIResponse{Success: false, Message: "Database error"})
+		}
+		return
+	}
+
+	respondJSON(w, 200, APIResponse{
+		Success: true,
+		Message: "Logged in successfully!",
+		Data: map[string]string{
+			"username":   req.Username,
+			"gjp2":       submittedGJP2,
+			"account_id": accountId,
+		},
+	})
+}
+
+// POST /api/login/validate — Sign Up: checks GD user profile for the code and saves credentials
 func handleLoginValidate(w http.ResponseWriter, r *http.Request) {
 	var req LoginValidateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondJSON(w, 400, APIResponse{Success: false, Message: "Invalid request body"})
 		return
 	}
-
 	if req.Username == "" || req.Password == "" || req.AccountID == "" {
 		respondJSON(w, 400, APIResponse{Success: false, Message: "Username, Password, and Account ID are required"})
 		return
 	}
-
 	targetID, err := strconv.Atoi(req.AccountID)
 	if err != nil {
 		respondJSON(w, 400, APIResponse{Success: false, Message: "Invalid numeric Account ID"})
 		return
 	}
-
-	// Check if account already exists
-	var storedGJP2 string
-	err = db.QueryRow("SELECT gjp2 FROM accounts WHERE accountId = ?", targetID).Scan(&storedGJP2)
-	isNew := (err == sql.ErrNoRows)
-
-	// If it's a new account, we MUST perform validation
-	if isNew {
-		if req.ValidationCode == "" {
-			respondJSON(w, 400, APIResponse{Success: false, Message: "Verification code is required for new accounts"})
-			return
-		}
-
-		info := getUserInfo(targetID)
-		if info == nil {
-			respondJSON(w, 404, APIResponse{Success: false, Message: "Geometry Dash account not found"})
-			return
-		}
-
-		if info["61"] != req.ValidationCode {
-			respondJSON(w, 401, APIResponse{
-				Success: false,
-				Message: fmt.Sprintf("Validation failed. Check if you set the token at the Custom Field in your GD Profile."),
-			})
-			return
-		}
-	} else {
-		// Existing account — verify the submitted password matches stored GJP2
-		submittedGJP2 := generateGJP2(req.Password)
-		if submittedGJP2 != storedGJP2 {
-			respondJSON(w, 401, APIResponse{Success: false, Message: "Invalid credentials"})
-			return
-		}
+	if req.ValidationCode == "" {
+		respondJSON(w, 400, APIResponse{Success: false, Message: "Verification code is required for Sign Up"})
+		return
 	}
-
-	// Success! Generate GJP2 and save/update user in DB
-	gjp2 := generateGJP2(req.Password)
-	if isNew {
-		_, err = db.Exec(
-			"INSERT INTO accounts (accountId, username, gjp2) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE username=VALUES(username), gjp2=VALUES(gjp2)",
-			targetID, req.Username, gjp2)
-		if err != nil {
-			respondJSON(w, 500, APIResponse{Success: false, Message: "Failed to save account: " + err.Error()})
-			return
-		}
+	info := getUserInfo(targetID)
+	if info == nil {
+		respondJSON(w, 404, APIResponse{Success: false, Message: "Geometry Dash account not found"})
+		return
+	}
+	if info["61"] != req.ValidationCode {
+		respondJSON(w, 401, APIResponse{
+			Success: false,
+			Message: "Validation failed. Check if you set the token at the Custom Field in your GD Profile.",
+		})
+		return
+	}
+	submittedGJP2 := generateGJP2(req.Password)
+	_, err = db.Exec(
+		"INSERT INTO accounts (accountId, username, gjp2) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE username=VALUES(username), gjp2=VALUES(gjp2)",
+		targetID, req.Username, submittedGJP2,
+	)
+	if err != nil {
+		respondJSON(w, 500, APIResponse{Success: false, Message: "Failed to save account: " + err.Error()})
+		return
 	}
 
 	log("Validated and saved user: "+req.Username, 0)
-
-	msg := "Login successful!"
-	if isNew {
-		msg = "Account validated and logged in!"
-	}
-
 	respondJSON(w, 200, APIResponse{
 		Success: true,
-		Message: msg,
+		Message: "Sign Up complete!",
 		Data: map[string]string{
 			"username":   req.Username,
-			"gjp2":       gjp2,
+			"gjp2":       submittedGJP2,
 			"account_id": req.AccountID,
 		},
 	})
@@ -542,6 +537,13 @@ func startServer() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/status", corsMiddleware(handleStatus))
+	mux.HandleFunc("/api/login", corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			handleLogin(w, r)
+		} else {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
 	mux.HandleFunc("/api/login/init", corsMiddleware(handleLoginInit))
 	mux.HandleFunc("/api/login/validate", corsMiddleware(handleLoginValidate))
 	mux.HandleFunc("/api/logout", corsMiddleware(handleLogout))
