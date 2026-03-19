@@ -572,13 +572,27 @@ func startServer() {
 	}))
 
 	fmt.Println("Welcome to GDDrive!")
-	log("GDDrive API server running on :3030", 0)
+
+	// Unified Server: Serve static files from the "dist" directory if it exists
+	distPaths := []string{"./dist", "../dist"}
+	for _, p := range distPaths {
+		if _, err := os.Stat(p); err == nil {
+			mux.Handle("/", http.FileServer(http.Dir(p)))
+			log("Consolidated Server: Serving frontend from "+p, 0)
+			break
+		}
+	}
+
+	log("GDDrive Unified Server running on :3030", 0)
 	http.ListenAndServe(":3030", mux)
 }
 
 func main() {
 	if err := godotenv.Load(); err == nil {
 		log(".env file loaded successfully", 0)
+	} else {
+		// Try root too if not found (since we might run from root)
+		godotenv.Load("../.env")
 	}
 	rand.Seed(time.Now().UnixNano())
 	startServer()

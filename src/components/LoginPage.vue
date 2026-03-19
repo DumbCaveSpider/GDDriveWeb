@@ -136,6 +136,7 @@ async function doLoginValidate() {
       </form>
 
       <p class="login-hint">The server will store your GJP2 for authentication purposes. If you wish not to use your GJP2 outside Geometry Dash, do not use this website.</p>
+      <p class="login-hint">Frontend/Backend created by <a href="https://github.com/DumbCaveSpider">@ArcticWoof</a></p>
     </div>
   </div>
 </template>

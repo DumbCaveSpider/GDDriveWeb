@@ -1,4 +1,4 @@
-export const API = 'http://localhost:3030/api'
+export const API = '/api'
 
 export function setCookie(name: string, value: string, days = 365) {
   const expires = new Date(Date.now() + days * 864e5).toUTCString()

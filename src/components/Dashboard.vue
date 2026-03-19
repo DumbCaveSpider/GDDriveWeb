@@ -220,10 +220,10 @@ async function doDeleteAccount() {
           </button>
         </div>
       </div>
-
     </div>
-    <footer class="app-footer">
-      <p>Credits to <a href="https://www.youtube.com/@SweepSweep2" target="_blank" rel="noopener noreferrer">@SweepSweep2 on YouTube</a></p>
+    <footer class="dash-footer">
+      <p class="dash-hint">Frontend/Backend created by <a href="https://github.com/DumbCaveSpider">@ArcticWoof</a></p>
+      <p class="dash-hint">Inspired by <a href="https://www.youtube.com/@SweepSweep2">@SweepSweep2</a></p>
     </footer>
   </div>
 </template>

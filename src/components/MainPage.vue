@@ -391,6 +391,28 @@ onMounted(async () => {
   border: 4px solid rgba(0,0,0,0.5);
 }
 
+.dash-footer {
+  margin-top: 24px;
+  padding: 20px;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+.dash-footer::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border-image-source: url('../assets/square1BG.png');
+  border-image-slice: 33% fill;
+  border-image-width: 30px;
+  opacity: 0.5;
+  z-index: -1;
+  pointer-events: none;
+}
+.dash-hint { font-family: 'Pusab', 'Chakra Petch', sans-serif; font-size: 20px; margin: 10px; }
+.dash-hint a { color: #7fc1ff; text-decoration: none; font-weight: 700; transition: color 0.1s; }
+.dash-hint a:hover { color: #7fc1ff; text-decoration: underline; }
+
 @media (max-width: 600px) {
   .login-card { padding: 32px 24px; }
   .stats-bar { flex-wrap: wrap; }
