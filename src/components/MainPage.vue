@@ -113,7 +113,7 @@ onMounted(async () => {
   position: fixed;
   inset: 0;
   z-index: 0;
-  background: linear-gradient(180deg, rgb(0, 75, 100) 0%, rgb(0, 40, 60) 100%);
+  background: linear-gradient(180deg, rgb(0, 100, 150) 0%, rgb(0, 25, 100) 100%);
   pointer-events: none;
 }
 

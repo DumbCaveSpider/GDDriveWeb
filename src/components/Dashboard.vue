@@ -304,7 +304,7 @@ async function doDeleteAccount() {
       </div>
     </div>
     <footer class="dash-footer">
-      <p class="dash-hint">Frontend/Backend created by <a href="https://github.com/DumbCaveSpider">@ArcticWoof</a></p>
+      <p class="dash-hint">Frontend/Backend created by <a href="https://arcticwoof.xyz">@ArcticWoof</a></p>
       <p class="dash-hint">Inspired by <a href="https://www.youtube.com/@SweepSweep2">@SweepSweep2</a></p>
     </footer>
   </div>
