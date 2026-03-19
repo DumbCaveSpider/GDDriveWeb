@@ -11,14 +11,13 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
+
+	"encoding/base64"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
 )
-
-// --- Request / Response structs ---
 
 type LoginInitRequest struct {
 	AccountID string `json:"account_id"`
@@ -59,19 +58,49 @@ func (c reqCreds) valid() bool {
 }
 
 func getCreds(r *http.Request) reqCreds {
-	return reqCreds{
+	creds := reqCreds{
 		Username:  r.Header.Get("X-GD-Username"),
 		GJP2:      r.Header.Get("X-GD-GJP2"),
 		AccountID: r.Header.Get("X-GD-AccountID"),
 	}
+	if creds.valid() {
+		return creds
+	}
+
+	cookie, err := r.Cookie("gddrive_auth")
+	if err == nil {
+		raw, err := base64.URLEncoding.DecodeString(cookie.Value)
+		if err == nil {
+			parts := strings.Split(string(raw), "|")
+			if len(parts) == 3 {
+				return reqCreds{
+					Username:  parts[0],
+					GJP2:      parts[1],
+					AccountID: parts[2],
+				}
+			}
+		}
+	}
+	return creds
+}
+
+func setAuthCookie(w http.ResponseWriter, username, gjp2, accountID string) {
+	val := base64.URLEncoding.EncodeToString([]byte(username + "|" + gjp2 + "|" + accountID))
+	http.SetCookie(w, &http.Cookie{
+		Name:     "gddrive_auth",
+		Value:    val,
+		Path:     "/",
+		MaxAge:   86400 * 30, // 30 days
+		HttpOnly: true,
+		Secure:   false, // Set to true if using HTTPS
+		SameSite: http.SameSiteLaxMode,
+	})
 }
 
 // --- Database state ---
 
 var (
-	db                 *sql.DB
-	pendingValidations = make(map[string]string)
-	pvLock             sync.Mutex
+	db *sql.DB
 )
 
 func initDB() {
@@ -132,13 +161,18 @@ func migrateIndex() {
 	}
 }
 
-// --- Middleware ---
-
 func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		} else {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-GD-Username, X-GD-GJP2, X-GD-AccountID")
+
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -165,6 +199,7 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 }
+
 // POST /api/login/init — starts validation by returning a code
 func handleLoginInit(w http.ResponseWriter, r *http.Request) {
 	var req LoginInitRequest
@@ -177,9 +212,6 @@ func handleLoginInit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	code := generateRandomCode(8)
-	pvLock.Lock()
-	pendingValidations[req.AccountID] = code
-	pvLock.Unlock()
 	respondJSON(w, 200, APIResponse{
 		Success: true,
 		Data: map[string]interface{}{
@@ -212,6 +244,8 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
+	setAuthCookie(w, req.Username, submittedGJP2, accountId)
 
 	respondJSON(w, 200, APIResponse{
 		Success: true,
@@ -262,9 +296,11 @@ func handleLoginValidate(w http.ResponseWriter, r *http.Request) {
 		targetID, req.Username, submittedGJP2,
 	)
 	if err != nil {
-		respondJSON(w, 500, APIResponse{Success: false, Message: "Failed to save account: " + err.Error()})
+		respondJSON(w, 500, APIResponse{Success: false, Message: "Failed to save account settings"})
 		return
 	}
+
+	setAuthCookie(w, req.Username, submittedGJP2, req.AccountID)
 
 	log("Validated and saved user: "+req.Username, 0)
 	respondJSON(w, 200, APIResponse{
@@ -279,6 +315,13 @@ func handleLoginValidate(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleLogout(w http.ResponseWriter, _ *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "gddrive_auth",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
 	respondJSON(w, 200, APIResponse{Success: true, Message: "Logged out successfully"})
 }
 
@@ -375,14 +418,13 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 	formData.Set("secret", "Wmfd2893gb7")
 	formData.Set("dvs", "3")
 
-	client := &http.Client{}
 	req, _ := http.NewRequest("POST", "https://www.boomlings.com/database/uploadGJLevel21.php", strings.NewReader(formData.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("User-Agent", "")
 
-	resp, err := client.Do(req)
+	resp, err := gdClient.Do(req)
 	if err != nil {
-		respondJSON(w, 500, APIResponse{Success: false, Message: "Upload request failed: " + err.Error()})
+		respondJSON(w, 500, APIResponse{Success: false, Message: "Upload request failed"})
 		return
 	}
 	defer resp.Body.Close()
@@ -403,7 +445,7 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 	_, err = db.Exec("REPLACE INTO files (fileName, levelId, levelName, accountId) VALUES (?, ?, ?, ?)",
 		fileName, levelID, levelName, creds.AccountID)
 	if err != nil {
-		respondJSON(w, 500, APIResponse{Success: false, Message: "Failed to update file index: " + err.Error()})
+		respondJSON(w, 500, APIResponse{Success: false, Message: "Failed to update file index"})
 		return
 	}
 
