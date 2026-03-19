@@ -87,20 +87,20 @@ async function doLoginValidate() {
       <div class="logo-block">
         <img class="brand-logo" src="../assets/gddrive-logo.png" alt="GD Drive" />
         <p class="brand-sub">Store files inside the Geometry Dash Server</p>
+      </div>
+
+      <!-- LANDING: LOGIN OR SIGN UP -->
+      <div v-if="authPhase === 'landing'" class="landing-actions">
         <footer class="app-footer">
           <p>Watch this video by <a href="https://youtube.com/@SweepSweep2" target="_blank" rel="noopener noreferrer">@SweepSweep2</a> on how it works!</p>
           <div class="video-embed">
             <iframe width="640" height="360" src="https://www.youtube-nocookie.com/embed/oENqzFJ3TgI?si=NPOjFARPw3WitqJB" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
           </div>
         </footer>
-      </div>
-
-      <!-- LANDING: LOGIN OR SIGN UP -->
-      <div v-if="authPhase === 'landing'" class="landing-actions">
-        <button class="btn-primary large-btn" @click="setPhase('login')">
+        <button class="btn-primary" @click="setPhase('login')">
           <span>Log In</span>
         </button>
-        <button class="btn-secondary large-btn" @click="setPhase('signup')">
+        <button class="btn-secondary" @click="setPhase('signup')">
           <span>Sign Up</span>
         </button>
       </div>
