@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"gddrive/log"
 	"io"
 	"math/rand"
 	"net/http"
@@ -107,24 +108,24 @@ func initDB() {
 	var err error
 	db, err = sql.Open("mysql", dsn)
 	if err != nil {
-		log("Failed to open MySQL connection: "+err.Error(), 2)
+		log.Error("Failed to open MySQL connection: " + err.Error())
 		os.Exit(1)
 	}
 
 	// Verify the connection
 	if err := db.Ping(); err != nil {
-		log("Failed to connect to MySQL/MariaDB server: "+err.Error(), 2)
-		log("Make sure the database exists and your credentials (DB_URL) are correct.", 2)
+		log.Error("Failed to connect to MySQL/MariaDB server: " + err.Error())
+		log.Error("Make sure the database exists and your credentials (DB_URL) are correct.")
 		os.Exit(1)
 	}
 
 	schema, err := os.ReadFile("schema.sql")
 	if err != nil {
-		log("Failed to read schema.sql: "+err.Error(), 2)
+		log.Error("Failed to read schema.sql: " + err.Error())
 	} else {
 		_, err = db.Exec(string(schema))
 		if err != nil {
-			log("Failed to execute schema: "+err.Error(), 2)
+			log.Error("Failed to execute schema: " + err.Error())
 		}
 	}
 }
@@ -276,7 +277,7 @@ func handleLoginValidate(w http.ResponseWriter, r *http.Request) {
 
 	setAuthCookie(w, req.Username, submittedGJP2, req.AccountID)
 
-	log("Validated and saved user: "+req.Username, 0)
+	log.Info("Validated and saved user: " + req.Username)
 	respondJSON(w, 200, APIResponse{
 		Success: true,
 		Message: "Sign Up complete!",
@@ -350,7 +351,7 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	fileName := header.Filename
 
-	log("Uploading level...", 0)
+	log.Info(fmt.Sprintf("[%s] Uploading level...", creds.Username))
 
 	levelString, objCount := makeLevel(fileBytes)
 	encodedLevel := encodeLevel(levelString, false)
@@ -405,14 +406,14 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 	resText := string(resBody)
 
 	if resText == "-1" {
-		log("Failed to upload level!", 2)
+		log.Error(fmt.Sprintf("[%s] Failed to upload level!", creds.Username))
 		respondJSON(w, 500, APIResponse{Success: false, Message: "GD server rejected the upload. Check your credentials."})
 		return
 	}
 
 	levelID, _ := strconv.Atoi(strings.TrimSpace(resText))
 
-	log(fmt.Sprintf("Level successfully uploaded! ID: %d", levelID), 0)
+	log.Done(fmt.Sprintf("Level successfully uploaded! ID: %d", levelID))
 
 	_, err = db.Exec("REPLACE INTO files (fileName, levelId, levelName, accountId) VALUES (?, ?, ?, ?)",
 		fileName, levelID, levelName, creds.AccountID)
@@ -447,6 +448,13 @@ func handleDownload(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, 500, APIResponse{Success: false, Message: "Failed to download level from GD servers"})
 		return
 	}
+
+	creds := getCreds(r)
+	dlUser := creds.Username
+	if dlUser == "" {
+		dlUser = "Anonymous"
+	}
+	log.Info(fmt.Sprintf("[%s] Downloading file: %s (Level ID: %d)", dlUser, req.FileName, levelId))
 
 	fileBytes := parseLevel(levelString)
 
@@ -491,6 +499,8 @@ func handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Info(fmt.Sprintf("[%s] Deleted file: %s", creds.Username, req.FileName))
+
 	respondJSON(w, 200, APIResponse{
 		Success: true,
 		Message: fmt.Sprintf("'%s' deleted successfully!", req.FileName),
@@ -528,7 +538,7 @@ func handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log(fmt.Sprintf("Account %s (%s) deleted successfully.", creds.Username, creds.AccountID), 0)
+	log.Done(fmt.Sprintf("Account %s (%s) deleted successfully.", creds.Username, creds.AccountID))
 	respondJSON(w, 200, APIResponse{
 		Success: true,
 		Message: "Account and all indexed files deleted successfully.",
@@ -586,25 +596,23 @@ func startServer() {
 		}
 	}))
 
-	fmt.Println("Welcome to GDDrive!")
-
 	// Serve static files from the "dist" directory if it exists
 	distPaths := []string{"./dist", "../dist"}
 	for _, p := range distPaths {
 		if _, err := os.Stat(p); err == nil {
 			mux.Handle("/", http.FileServer(http.Dir(p)))
-			log("GDDrive Server: Serving frontend from "+p, 0)
+			log.Info("GDDrive Server: Serving frontend from " + p)
 			break
 		}
 	}
 
-	log("GDDrive Server running on :3002", 0)
+	log.Info("GDDrive Server running on :3002")
 	http.ListenAndServe(":3002", mux)
 }
 
 func main() {
 	if err := godotenv.Load(); err == nil {
-		log(".env file loaded successfully", 0)
+		log.Info(".env file loaded successfully")
 	} else {
 		godotenv.Load("../.env")
 	}

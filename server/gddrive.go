@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	gddlog "gddrive/log"
 )
 
 var (
@@ -31,25 +33,26 @@ type IndexData map[string]struct {
 	LevelName string `json:"level_name"`
 }
 
-func log(message string, level int, function ...string) {
-	now := time.Now().Format("15:04:05")
-	var levelStr string
-	switch level {
-	case 1:
-		levelStr = " [WARNING]"
-	case 2:
-		levelStr = " [ERROR]"
-	}
-
+func gdLog(message string, level int, function ...string) {
 	fn := ""
 	if len(function) > 0 {
 		fn = function[0]
 	}
 
+	msg := message
 	if fn != "" {
-		fmt.Printf("[%s]%s %s: %s\n", now, levelStr, fn, message)
-	} else {
-		fmt.Printf("[%s]%s %s\n", now, levelStr, message)
+		msg = fn + ": " + message
+	}
+
+	switch level {
+	case 0:
+		gddlog.Info(msg)
+	case 1:
+		gddlog.Warn(msg)
+	case 2:
+		gddlog.Error(msg)
+	default:
+		gddlog.Print(msg)
 	}
 }
 
@@ -298,7 +301,7 @@ func downloadLevel(id int) string {
 
 	resp, err := gdClient.Do(req)
 	if err != nil {
-		log("Download request error: "+err.Error(), 2)
+		gdLog("Download request error: "+err.Error(), 2)
 		return ""
 	}
 	defer resp.Body.Close()
@@ -307,7 +310,7 @@ func downloadLevel(id int) string {
 	text := string(body)
 
 	if text == "-1" {
-		log(fmt.Sprintf("GD server rejected download for level %d (Auth failure?)", id), 2)
+		gdLog(fmt.Sprintf("GD server rejected download for level %d (Auth failure?)", id), 2)
 		return ""
 	}
 
@@ -326,10 +329,10 @@ func downloadLevel(id int) string {
 	}
 
 	if levelString == "" {
-		log(fmt.Sprintf("Level %d not found!", id), 2)
+		gdLog(fmt.Sprintf("Level %d not found!", id), 2)
 		return ""
 	}
-	log(fmt.Sprintf("Downloaded level %d!", id), 0)
+	gdLog(fmt.Sprintf("Downloaded level %d!", id), 0)
 	return decodeLevel(levelString, false)
 }
 
@@ -348,7 +351,7 @@ func deleteLevel(id int, accountID string, gjp2 string) int {
 
 	resp, err := gdClient.Do(req)
 	if err != nil {
-		log("Delete request error: "+err.Error(), 2)
+		gdLog("Delete request error: "+err.Error(), 2)
 		return 1
 	}
 	defer resp.Body.Close()
@@ -358,11 +361,11 @@ func deleteLevel(id int, accountID string, gjp2 string) int {
 
 	if resBody == "1" || resBody == "" || !strings.Contains(resBody, "-1") {
 		if resBody != "-1" {
-			log(fmt.Sprintf("Level ID %d deleted successfully from GD! (%s)", id, resBody), 0)
+			gdLog(fmt.Sprintf("Level ID %d deleted successfully from GD! (%s)", id, resBody), 0)
 			return 0
 		}
 	}
 
-	log(fmt.Sprintf("Could not delete level ID %d! GD Response: %s", id, resBody), 2)
+	gdLog(fmt.Sprintf("Could not delete level ID %d! GD Response: %s", id, resBody), 2)
 	return 1
 }

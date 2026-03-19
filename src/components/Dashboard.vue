@@ -182,7 +182,7 @@ function onFileInput(e: Event) {
 
 onMounted(fetchFiles)
 async function doDeleteAccount() {
-  if (!confirm('Are you sure you want to delete your account from GDDrive? This action cannot be undone.')) return
+  if (!confirm('Are you sure you want to delete your account from GDDrive? You have to manually delete the levels in-game. This action cannot be undone.')) return
   loading.value = true
   try {
     const res = await fetch(`${API}/account`, {

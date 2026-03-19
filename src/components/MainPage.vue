@@ -346,7 +346,7 @@ onMounted(async () => {
   border: 6px solid transparent;
   border-image-source: url('../assets/button1BG.png');
   border-image-slice: 40% fill;
-  border-image-width: 20px;
+  border-image-width: 25px;
   background: transparent;
   color: #fff;
   cursor: pointer;
