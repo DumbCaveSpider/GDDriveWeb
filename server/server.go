@@ -488,9 +488,10 @@ func handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result := deleteLevel(levelId, creds.AccountID, creds.GJP2)
+	gdFailed := false
 	if result != 0 {
-		respondJSON(w, 500, APIResponse{Success: false, Message: "Failed to delete level from GD servers"})
-		return
+		log.Error(fmt.Sprintf("[%s] Failed to delete level %d from GD servers", creds.Username, levelId))
+		gdFailed = true
 	}
 
 	_, err = db.Exec("DELETE FROM files WHERE fileName = ? AND accountId = ?", req.FileName, creds.AccountID)
@@ -499,12 +500,19 @@ func handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Info(fmt.Sprintf("[%s] Deleted file: %s", creds.Username, req.FileName))
+	log.Info(fmt.Sprintf("[%s] Deleted file index: %s", creds.Username, req.FileName))
 
-	respondJSON(w, 200, APIResponse{
-		Success: true,
-		Message: fmt.Sprintf("'%s' deleted successfully!", req.FileName),
-	})
+	if gdFailed {
+		respondJSON(w, 200, APIResponse{
+			Success: true,
+			Message: fmt.Sprintf("'%s' removed from database (GD server deletion failed).", req.FileName),
+		})
+	} else {
+		respondJSON(w, 200, APIResponse{
+			Success: true,
+			Message: fmt.Sprintf("'%s' deleted successfully!", req.FileName),
+		})
+	}
 }
 
 func handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
