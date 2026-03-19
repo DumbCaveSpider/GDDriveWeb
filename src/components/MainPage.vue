@@ -28,9 +28,19 @@ function handleLoggedOut() {
 
 onMounted(async () => {
   // Always show the landing/login choice first as requested
-  const res = await fetch(`${API}/status`, { headers: credHeaders() }).catch(() => null)
-  if (!res) {
+  const res = await fetch(`${API}/status`, { 
+    headers: credHeaders(), 
+    credentials: 'include' 
+  }).catch(() => null)
+  
+  if (!res || !res.ok) {
     showToast('Cannot reach the Go server. Start it with: go run . in server/', 'error')
+    return
+  }
+
+  const json = await res.json()
+  if (json.success && json.data.logged_in) {
+    handleLoggedIn(json.data.username, json.data.account_id)
   }
 })
 </script>

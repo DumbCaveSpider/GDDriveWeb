@@ -194,8 +194,9 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, 200, APIResponse{
 		Success: true,
 		Data: map[string]interface{}{
-			"logged_in": creds.valid(),
-			"username":  creds.Username,
+			"logged_in":  creds.valid(),
+			"username":   creds.Username,
+			"account_id": creds.AccountID,
 		},
 	})
 }
