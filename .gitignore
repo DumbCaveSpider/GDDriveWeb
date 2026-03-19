@@ -25,5 +25,4 @@ dist-ssr
 
 # crap
 server/.env
-server/gddrive.exe
-server/Downloads
+server/*.exe

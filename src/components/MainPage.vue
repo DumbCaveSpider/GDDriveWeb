@@ -47,7 +47,6 @@ onMounted(async () => {
 
 <template>
   <div class="gd-root">
-    <!-- Static BG -->
     <div class="main-bg"></div>
 
     <!-- Toast -->
@@ -70,7 +69,6 @@ onMounted(async () => {
 </template>
 
 <style>
-/* Global-ish styles for the app. Not scoped so they hit sub-components. */
 @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;700&display=swap');
 
 @font-face {
@@ -89,7 +87,7 @@ onMounted(async () => {
 }
 
 /* Base Pusab font for titles, buttons, tabs */
-.brand, .btn-primary, .btn-ghost, .tab, h1, h2, .verify-code, .stat-num, .field-group label, .btn-secondary {
+.brand, .btn-primary, .btn-ghost, .tab, h1, h2, .verify-code, .stat-num, .field-group label, .btn-secondary, .file-name {
   font-family: 'Pusab', 'Chakra Petch', sans-serif;
   letter-spacing: 0.5px;
   text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
@@ -104,6 +102,11 @@ onMounted(async () => {
 
 .brand-sub {
   padding: 10px;
+}
+
+.file-name {
+  font-size: 25px;
+  margin-bottom: 5px;
 }
 
 .main-bg {
@@ -203,8 +206,9 @@ onMounted(async () => {
 .input-wrap { position: relative; }
 .input-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 14px; color: #64748b; }
 .input-wrap input, .styled-select {
-  width: 100%; padding: 13px 14px 13px 40px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 12px; color: #e2e8f0; font-size: 15px; outline: none; transition: transform 0.1s;
+  width: 100%; padding: 13px 14px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px; color: #e2e8f0; font-size: 15px; font-family: 'Helvetica', Arial, sans-serif; outline: none; transition: transform 0.1s;
+  text-align: center;
 }
 .styled-select { padding-left: 14px; cursor: pointer; }
 .input-wrap input:focus, .styled-select:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2); }
@@ -263,7 +267,7 @@ onMounted(async () => {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  border: 12px solid transparent; /* default for nine-slice */
+  border: 12px solid transparent;
   border-image-source: url('../assets/square1BG.png');
   border-image-slice: 33% fill;
   border-image-width: 50px;
@@ -350,16 +354,16 @@ onMounted(async () => {
   font-size: 14px;
   padding: 4px 10px;
   transition: transform 0.1s;
-  min-width: 36px;
+  min-width: 48px;
   text-align: center;
 }
 .btn-sm.secondary { border-image-source: url('../assets/button2BG.png'); }
 .btn-sm:hover { transform: scale(1.1); }
 .btn-sm:active { transform: scale(0.92); }
-.btn-icon { height: 32px; width: 24px; object-fit: contain; flex-shrink: 0; }
+.btn-icon { width: 32px; height: 42px; object-fit: contain; }
 .btn-danger { padding: 8px 18px; border-radius: 10px; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25); color: #f87171; cursor: pointer; }
 
-.spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+.spinner { width: 32px; height: 32px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .login-hint { text-align: center; font-size: 12px; margin-top: 20px; line-height: 1.6; }
@@ -435,5 +439,31 @@ onMounted(async () => {
   .login-card { padding: 32px 24px; }
   .stats-bar { flex-wrap: wrap; }
   .tabs { flex-wrap: wrap; }
+  
+  .dash-header { 
+    flex-direction: column; 
+    justify-content: center; 
+    gap: 16px; 
+    text-align: center;
+  }
+  .dash-user { 
+    justify-content: center; 
+    flex-wrap: wrap;
+  }
+
+  .file-item { 
+    flex-direction: column; 
+    align-items: center; 
+    text-align: center; 
+    gap: 10px;
+  }
+  .file-info { 
+    width: 100%; 
+  }
+  .file-actions { 
+    justify-content: center; 
+    width: 100%; 
+    margin-top: 4px;
+  }
 }
 </style>

@@ -21,6 +21,13 @@ function setPhase(p: 'landing' | 'login' | 'signup') {
   }
 }
 
+function copyCode() {
+  if (validationCode.value) {
+    navigator.clipboard.writeText(validationCode.value)
+      .then(() => emit('showToast', 'Verification code copied to clipboard!', 'info'))
+      .catch(() => emit('showToast', 'Failed to copy', 'error'))
+  }
+}
 
 async function doLogin() {
   if (!username.value || !password.value) {
@@ -89,7 +96,7 @@ async function doLoginValidate() {
         <p class="brand-sub">Store files inside the Geometry Dash Server</p>
       </div>
 
-      <!-- LANDING: LOGIN OR SIGN UP -->
+      <!-- LANDING -->
       <div v-if="authPhase === 'landing'" class="landing-actions">
         <footer class="app-footer">
           <p>Watch this video by <a href="https://youtube.com/@SweepSweep2" target="_blank" rel="noopener noreferrer">@SweepSweep2</a> on how it works!</p>
@@ -98,14 +105,14 @@ async function doLoginValidate() {
           </div>
         </footer>
         <button class="btn-primary" @click="setPhase('login')">
-          <span>Log In</span>
+          <span>Login</span>
         </button>
         <button class="btn-secondary" @click="setPhase('signup')">
           <span>Sign Up</span>
         </button>
       </div>
 
-      <!-- DIRECT LOGIN -->
+      <!-- LOGIN -->
       <form v-else-if="authPhase === 'login'" @submit.prevent="doLogin" id="login-form-direct">
         <div class="field-group">
           <label for="login-username">Username</label>
@@ -128,11 +135,11 @@ async function doLoginValidate() {
         </div>
       </form>
 
-      <!-- SIGN UP FLOW -->
+      <!-- SIGN UP -->
       <form v-else-if="authPhase === 'signup'" @submit.prevent="doLoginValidate" id="login-form-signup">
         <div class="verify-instructions">
-          <p>To verify ownership, set your profile's <strong>Custom</strong> field to the following token</p>
-          <div class="verify-code">{{ validationCode }}</div>
+          <p>To verify ownership of your account, set your profile's <strong>Custom</strong> field to the following one-time authentication token</p>
+          <div class="verify-code" @click="copyCode" style="cursor: pointer;" title="Click to copy">{{ validationCode }}</div>
         </div>
 
         <div class="field-group">
@@ -156,7 +163,7 @@ async function doLoginValidate() {
         
         <div class="btn-row">
           <button id="signup-btn" type="submit" class="btn-primary" :class="{ loading }" :disabled="loading">
-            <span v-if="!loading">Link & Sign Up</span>
+            <span v-if="!loading">Validate & Sign Up</span>
             <span v-else class="spinner"></span>
           </button>
           <button type="button" class="btn-secondary" @click="authPhase = 'landing'">Back</button>

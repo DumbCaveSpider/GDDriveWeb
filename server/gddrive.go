@@ -357,8 +357,6 @@ func deleteLevel(id int, accountID string, gjp2 string) int {
 	resBody := string(body)
 
 	if resBody == "1" || resBody == "" || !strings.Contains(resBody, "-1") {
-		// GD usually returns "1" on success (or just a non -1 code?)
-		// Wait, for deleteGJLevelUser20.php, success is usually NOT -1.
 		if resBody != "-1" {
 			log(fmt.Sprintf("Level ID %d deleted successfully from GD! (%s)", id, resBody), 0)
 			return 0

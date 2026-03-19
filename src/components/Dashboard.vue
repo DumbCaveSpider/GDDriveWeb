@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { API, credHeaders, deleteCookie } from '../utils/gd'
 
 const props = defineProps<{
@@ -21,6 +21,13 @@ const downloadingFiles = ref<Record<string, boolean>>({})
 const downloadProgress = ref<Record<string, number>>({})
 const loading = ref(false)
 const uploadProgress = ref(0)
+const searchQuery = ref('')
+
+const filteredFiles = computed(() => {
+  if (!searchQuery.value) return files.value
+  const q = searchQuery.value.toLowerCase()
+  return files.value.filter(f => f.name.toLowerCase().includes(q))
+})
 
 async function fetchFiles() {
   try {
@@ -175,7 +182,7 @@ function onFileInput(e: Event) {
 
 onMounted(fetchFiles)
 async function doDeleteAccount() {
-  if (!confirm('DELETE ACCOUNT? This will permanently remove all your file indexes from GDDrive. This cannot be undone.')) return
+  if (!confirm('Are you sure you want to delete your account from GDDrive? This action cannot be undone.')) return
   loading.value = true
   try {
     const res = await fetch(`${API}/account`, {
@@ -206,7 +213,7 @@ async function doDeleteAccount() {
           <span>Logged in as: {{ username }}</span>
         </div>
         <button id="delete-acc-btn" class="btn-sm secondary" title="Delete Account" :disabled="loading" @click="doDeleteAccount">
-          <img src="../assets/delete-white.png" class="btn-icon" alt="Delete" />
+          <img src="../assets/delete.png" class="btn-icon" alt="Delete" />
         </button>
         <button id="logout-btn" class="btn-sm secondary" title="Sign Out" @click="doLogout">
           <img src="../assets/logout.png" class="btn-icon" alt="Logout" />
@@ -226,20 +233,26 @@ async function doDeleteAccount() {
             <h2>Your Files</h2>
             <span class="stat-num">{{ files.length }} Files Stored</span>
           </div>
-          <button class="btn-sm" title="Refresh" @click="fetchFiles">
-            <img class="btn-icon" src="../assets/reload.png" alt="Refresh" />
-          </button>
+          <div class="header-actions">
+            <input class="search-input" v-model="searchQuery" type="text" placeholder="Search files..." />
+            <button class="btn-sm" title="Refresh" @click="fetchFiles">
+              <img class="btn-icon" src="../assets/reload.png" alt="Refresh" />
+            </button>
+          </div>
         </div>
         <div class="panel-content">
           <div v-if="files.length === 0" class="empty-state">
             <p>No files yet. Upload your first file!</p>
           </div>
+          <div v-else-if="filteredFiles.length === 0" class="empty-state">
+            <p>No matching files found.</p>
+          </div>
           <ul v-else class="file-list">
-            <li v-for="f in files" :key="f.name" class="file-item">
+            <li v-for="f in filteredFiles" :key="f.name" class="file-item">
               <img class="file-icon-img" src="../assets/file.png" alt="File" />
               <div class="file-info">
                 <span class="file-name">{{ f.name }}</span>
-                <span class="file-meta">Level ID: {{ f.level_id }} · Level Name: {{ f.level_name }}</span>
+                <span class="file-meta"><strong>Level ID:</strong> {{ f.level_id }} - <strong>Level Name:</strong> {{ f.level_name }}</span>
                 <div v-if="downloadingFiles[f.name]" class="dl-progress-bar-container">
                   <div class="dl-progress-bar" :style="{ width: (downloadProgress[f.name] || 0) + '%' }"></div>
                   <span class="dl-progress-text">{{ downloadProgress[f.name] || 0 }}%</span>
@@ -352,5 +365,39 @@ async function doDeleteAccount() {
   font-weight: bold;
   color: white;
   text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.search-input {
+  padding: 8px 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 14px;
+  font-family: 'Helvetica', Arial, sans-serif;
+  outline: none;
+  width: 180px;
+  transition: all 0.2s;
+}
+.search-input:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+  width: 200px;
+}
+
+@media (max-width: 600px) {
+  .header-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  .search-input {
+    width: 100% !important;
+  }
 }
 </style>

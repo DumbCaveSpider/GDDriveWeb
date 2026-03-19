@@ -97,17 +97,12 @@ func setAuthCookie(w http.ResponseWriter, username, gjp2, accountID string) {
 	})
 }
 
-// --- Database state ---
-
 var (
 	db *sql.DB
 )
 
 func initDB() {
 	dsn := os.Getenv("DB_URL")
-	if dsn == "" {
-		dsn = "root@tcp(127.0.0.1:3306)/gddrive?parseTime=true&multiStatements=true"
-	}
 
 	var err error
 	db, err = sql.Open("mysql", dsn)
@@ -129,34 +124,7 @@ func initDB() {
 	} else {
 		_, err = db.Exec(string(schema))
 		if err != nil {
-			log("Failed to execute schema (MySQL compatibility): "+err.Error(), 2)
-		}
-	}
-
-	// Migration from index.json
-	migrateIndex()
-}
-
-func migrateIndex() {
-	data, err := os.ReadFile("index.json")
-	if err == nil {
-		var index map[string]struct {
-			LevelID   int    `json:"level_id"`
-			LevelName string `json:"level_name"`
-		}
-		if json.Unmarshal(data, &index) == nil && len(index) > 0 {
-			log("Migrating index.json to database...", 0)
-			for name, info := range index {
-				// We don't know the account id, so we skip if no accounts exist or use a default
-				// For now, only migrate if at least one account exists? No, let's keep it in files with accountId 0 if necessary.
-				_, err := db.Exec("INSERT IGNORE INTO files (fileName, levelId, levelName, accountId) VALUES (?, ?, ?, 0)",
-					name, info.LevelID, info.LevelName)
-				if err != nil {
-					log("Migration error for "+name+": "+err.Error(), 2)
-				}
-			}
-			// Rename or delete index.json to avoid multiple migrations
-			os.Rename("index.json", "index.json.bak")
+			log("Failed to execute schema: "+err.Error(), 2)
 		}
 	}
 }
@@ -187,8 +155,6 @@ func respondJSON(w http.ResponseWriter, status int, payload interface{}) {
 	json.NewEncoder(w).Encode(payload)
 }
 
-// --- Handlers ---
-
 func handleStatus(w http.ResponseWriter, r *http.Request) {
 	creds := getCreds(r)
 	respondJSON(w, 200, APIResponse{
@@ -201,7 +167,7 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// POST /api/login/init — starts validation by returning a code
+// starts validation by returning a code
 func handleLoginInit(w http.ResponseWriter, r *http.Request) {
 	var req LoginInitRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -222,7 +188,7 @@ func handleLoginInit(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// POST /api/login — direct login for existing accounts
+// direct login for existing accounts
 func handleLogin(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username string `json:"username"`
@@ -239,7 +205,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	err := db.QueryRow("SELECT accountId FROM accounts WHERE username = ? AND gjp2 = ?", req.Username, submittedGJP2).Scan(&accountId)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			respondJSON(w, 401, APIResponse{Success: false, Message: "Invalid credentials. If you haven't linked your account yet, please use Sign Up instead."})
+			respondJSON(w, 401, APIResponse{Success: false, Message: "Invalid credentials."})
 		} else {
 			respondJSON(w, 500, APIResponse{Success: false, Message: "Database error"})
 		}
@@ -259,7 +225,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// POST /api/login/validate — Sign Up: checks GD user profile for the code and saves credentials
+// checks GD user profile for the code and saves credentials
 func handleLoginValidate(w http.ResponseWriter, r *http.Request) {
 	var req LoginValidateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -282,6 +248,13 @@ func handleLoginValidate(w http.ResponseWriter, r *http.Request) {
 	info := getUserInfo(targetID)
 	if info == nil {
 		respondJSON(w, 404, APIResponse{Success: false, Message: "Geometry Dash account not found"})
+		return
+	}
+	if !strings.EqualFold(info["1"], req.Username) {
+		respondJSON(w, 400, APIResponse{
+			Success: false,
+			Message: "Username does not match the Geometry Dash account",
+		})
 		return
 	}
 	if info["61"] != req.ValidationCode {
@@ -328,8 +301,6 @@ func handleLogout(w http.ResponseWriter, _ *http.Request) {
 
 func handleListFiles(w http.ResponseWriter, r *http.Request) {
 	creds := getCreds(r)
-	// We allow listing all for now, or filter by user?
-	// User said "accounts who owns that account". Let's filter by the requesting user.
 	if !creds.valid() {
 		respondJSON(w, 401, APIResponse{Success: false, Message: "Login required to list files"})
 		return
@@ -564,8 +535,6 @@ func handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// --- Utils ---
-
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 func generateRandomCode(n int) string {
@@ -637,7 +606,6 @@ func main() {
 	if err := godotenv.Load(); err == nil {
 		log(".env file loaded successfully", 0)
 	} else {
-		// Try root too if not found (since we might run from root)
 		godotenv.Load("../.env")
 	}
 	rand.Seed(time.Now().UnixNano())
