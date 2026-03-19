@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import LoginPage from './LoginPage.vue'
 import Dashboard from './Dashboard.vue'
-import { API, getCookie, credHeaders } from '../utils/gd'
+import { API, credHeaders } from '../utils/gd'
 
 // --- State ---
 const view = ref<'login' | 'dashboard'>('login')
