@@ -2,4 +2,4 @@
 
 Store files inside the Geometry Dash Server
 
-# https://gddrive.arcticwoof.xyz/
+## Go to https://gddrive.arcticwoof.xyz/ to try it out!
